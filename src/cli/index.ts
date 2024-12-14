@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import { MasCLI } from "../command/MasCLI";
-
-function main(): void {
-    const mas = new MasCLI();
-    mas.run();
+import colors from "colors";
+async function main(): Promise<void> {
+  const mas = new MasCLI();
+  await mas.run();
 }
 
-main();
+main().catch(error => {
+  console.error(colors.red("An error occurred:"), error);
+  process.exit(1);
+});

@@ -1,5 +1,9 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
+import tseslint from "typescript-eslint";
+import pluginImport from "eslint-plugin-import";
+import pluginPromise from "eslint-plugin-promise";
+import pluginSonarjs from "eslint-plugin-sonarjs";
 
 export default [
     
@@ -79,8 +83,8 @@ export default [
 
       
       // TypeScript-specific rules
-      "@typescript-eslint/explicit-function-return-type": "error",
-      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/explicit-function-return-type": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": ["error", {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_"

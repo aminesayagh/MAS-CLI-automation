@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { IBaseCommand } from "../types/command";
 
-export class CommandExit implements IBaseCommand<void> {
+export interface ICommandOptionsExit {
+  message?: string;
+}
+
+export class CommandExit implements IBaseCommand<ICommandOptionsExit> {
   public command: Command;
 
   public constructor() {
@@ -12,7 +16,8 @@ export class CommandExit implements IBaseCommand<void> {
     this.command.description("Exit the CLI");
   }
 
-  public execute(): void {
+  public execute(options: ICommandOptionsExit): void {
+    console.log(options.message || "Thank you for using MAS CLI. Goodbye!");
     process.exit(0);
   }
 }

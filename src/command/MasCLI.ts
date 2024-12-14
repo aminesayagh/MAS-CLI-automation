@@ -4,8 +4,9 @@ import inquirer from "inquirer";
 
 import { CommandList } from "./CommandList";
 import { CommandExit } from "./CommandExit";
-import { IBaseCommand, CommandRegistry } from "../types/command";
+import { CommandDoc } from "./CommandDoc";
 
+import { IBaseCommand, CommandRegistry } from "../types/command";
 export class MasCLI {
   private program: Command;
   private commandRegistry: CommandRegistry;
@@ -39,7 +40,7 @@ export class MasCLI {
 
     // Register all commands
     this.registerCommand<{ all: boolean }>(new CommandList());
-    // register exit command
+    this.registerCommand(new CommandDoc());
     this.registerCommand(new CommandExit());
 
     // Add help text for when no command is provided

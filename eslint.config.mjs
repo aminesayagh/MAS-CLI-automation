@@ -74,7 +74,6 @@ export default [
       
       // SonarJS Rules
       "sonarjs/no-identical-functions": "error",
-      "sonarjs/no-duplicate-string": ["error", { "threshold": 3 }],
       "sonarjs/cognitive-complexity": ["error", 15],
       "sonarjs/no-redundant-jump": "error",
       "sonarjs/no-small-switch": "error",

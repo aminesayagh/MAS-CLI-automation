@@ -12,7 +12,11 @@ interface IFileInfo {
   lastModified: Date;
 }
 
-export class CommandList implements IBaseCommand<{ all: boolean }> {
+export interface ICommandOptionsList {
+  all: boolean;
+}
+
+export class CommandList implements IBaseCommand<ICommandOptionsList> {
   public command: Command;
 
   public constructor() {
@@ -23,11 +27,10 @@ export class CommandList implements IBaseCommand<{ all: boolean }> {
   public configure(): void {
     this.command
       .description("List files in the current directory")
-      .option("-a, --all", "Show hidden files", false)
-      .action(options => this.execute(options));
+      .option("-a, --all", "Show hidden files", false);
   }
 
-  public execute(options: { all: boolean }): void {
+  public execute(options: ICommandOptionsList): void {
     try {
       const currentDir = process.cwd();
       const files = readdirSync(currentDir);

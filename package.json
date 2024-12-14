@@ -1,0 +1,56 @@
+{
+  "name": "mas",
+  "version": "1.0.0",
+  "description": "CLI automation with AI, for developers",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18.x"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "node build.js",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "build:start": "node build.js && node dist/index.js",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "lint:fix": "eslint --fix .",
+    "fix": "npm run lint:fix && npm run format",
+    "ci": "npm run typecheck && npm run lint && npm run format:check && npm run build:start"
+  },
+  "bin": {
+    "mas": "./dist/index.js"
+  },
+  "author": "Mohamed Amine SAYAGH",
+  "homepage": "https://masayagh.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aminesayagh/mas"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.4",
+    "@babel/preset-typescript": "^7.24.7",
+    "eslint": "^9.17.0",
+    "eslint-plugin-promise": "^7.2.1",
+    "globals": "^15.13.0",
+    "prettier": "^3.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  },
+  "dependencies": {
+    "colors": "^1.4.0",
+    "commander": "^12.1.0",
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-typescript": "^2.0.0",
+    "global": "^4.4.0",
+    "mark-parse": "^2.1.0",
+    "remark": "^15.0.1",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0",
+    "zod": "^3.24.1"
+  }
+}

@@ -1,9 +1,9 @@
-import { Command } from "commander";
 import colors from "colors";
 import { readdirSync, statSync } from "fs";
 import { join } from "path";
+import zod from "zod";
 
-import { IBaseCommand } from "../types/command";
+import { BaseCommand } from "../types/command";
 
 interface IFileInfo {
   name: string;
@@ -16,21 +16,20 @@ export interface ICommandOptionsList {
   all: boolean;
 }
 
-export class CommandList implements IBaseCommand<ICommandOptionsList> {
-  public command: Command;
+export class CommandList extends BaseCommand<ICommandOptionsList> {
+  public static readonly DEFAULT_CONFIG: ICommandOptionsList = {
+    all: false
+  };
+
+  public readonly SCHEMA = zod.object({
+    all: zod.boolean().default(CommandList.DEFAULT_CONFIG.all)
+  });
 
   public constructor() {
-    this.command = new Command("list");
-    this.configure();
+    super("list");
   }
 
-  public configure(): void {
-    this.command
-      .description("List files in the current directory")
-      .option("-a, --all", "Show hidden files", false);
-  }
-
-  public execute(options: ICommandOptionsList): void {
+  public execute(options: Partial<ICommandOptionsList>): void {
     try {
       const currentDir = process.cwd();
       const files = readdirSync(currentDir);
@@ -85,5 +84,10 @@ export class CommandList implements IBaseCommand<ICommandOptionsList> {
       size: stats.size,
       lastModified: stats.mtime
     };
+  }
+  protected configure(): void {
+    this.command
+      .description("List files in the current directory")
+      .option("-a, --all", "Show hidden files", false);
   }
 }

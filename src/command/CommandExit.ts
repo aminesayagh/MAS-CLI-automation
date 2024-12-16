@@ -1,23 +1,25 @@
-import { Command } from "commander";
-import { IBaseCommand } from "../types/command";
+import { BaseCommand } from "../types/command";
+import zod from "zod";
 
 export interface ICommandOptionsExit {
   message?: string;
 }
 
-export class CommandExit implements IBaseCommand<ICommandOptionsExit> {
-  public command: Command;
+export class CommandExit extends BaseCommand<ICommandOptionsExit> {
+  public readonly SCHEMA = zod.object({
+    message: zod.string().default("Thank you for using MAS CLI. Goodbye!")
+  });
 
   public constructor() {
-    this.command = new Command("exit");
-  }
-
-  public configure(): void {
-    this.command.description("Exit the CLI");
+    super("exit");
   }
 
   public execute(options: ICommandOptionsExit): void {
-    console.log(options.message || "Thank you for using MAS CLI. Goodbye!");
+    console.log(this.SCHEMA.parse(options).message);
     process.exit(0);
+  }
+
+  protected configure(): void {
+    this.command.description("Exit the CLI");
   }
 }

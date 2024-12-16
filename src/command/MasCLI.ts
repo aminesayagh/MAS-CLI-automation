@@ -57,6 +57,7 @@ export class MasCLI {
 
   private registerCommand<T>(command: IBaseCommand<T>): void {
     this.commandRegistry.set(command.command.name(), {
+      SCHEMA: command.SCHEMA,
       command: command.command,
       execute: command.execute as (options: unknown) => Promise<void>
     });

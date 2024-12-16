@@ -1,787 +1,473 @@
 # Code Documentation
-Generated on: 2024-12-16T19:37:13.011Z
-Total files: 15
+Generated on: 2024-12-16T20:39:48.302Z
+Total files: 12
 
 ## Project Structure
 
 ```
 └── mas
     └── src
-        ├── cli
-        │   └── index.ts
-        ├── command
-        │   ├── CommandDoc.ts
-        │   ├── CommandExit.ts
-        │   ├── CommandList.ts
-        │   └── MasCLI.ts
-        ├── services
-        │   ├── serviceDocumentation
-        │   │   ├── ServiceContent.ts
-        │   │   ├── ServiceDocumentation.ts
-        │   │   ├── ServiceMarkdown.ts
-        │   │   ├── ServiceTree.ts
-        │   │   ├── index.ts
-        │   │   └── types.ts
-        │   └── serviceFileSystem
-        │       ├── FileSystemService.ts
-        │       └── index.ts
-        └── types
-            ├── command.ts
-            └── zod.ts
+        └── services
+            └── serviceDocumentation
+                └── ServiceTree.ts
 ```
 
-## File: index.ts
-- Path: `/root/git/mas/src/cli/index.ts`
-- Size: 288.00 B
-- Extension: .ts
-- Lines of code: 11
+## File: pre-applypatch.sample
+- Path: `/root/git/mas/.git/hooks/pre-applypatch.sample`
+- Size: 424.00 B
+- Extension: .sample
+- Lines of code: 13
 
-```ts
-#!/usr/bin/env node
+```sample
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed
+# by applypatch from an e-mail message.
+#
+# The hook should exit with non-zero status after issuing an
+# appropriate message if it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-applypatch".
 
-import { MasCLI } from "../command/MasCLI";
-import colors from "colors";
-async function main(): Promise<void> {
-  const mas = new MasCLI();
-  await mas.run();
-}
-
-main().catch(error => {
-  console.error(colors.red("An error occurred:"), error);
-  process.exit(1);
-});
+. git-sh-setup
+precommit="$(git rev-parse --git-path hooks/pre-commit)"
+test -x "$precommit" && exec "$precommit" ${1+"$@"}
+:
 
 ```
 
 ---------------------------------------------------------------------------
 
-## File: CommandDoc.ts
-- Path: `/root/git/mas/src/command/CommandDoc.ts`
-- Size: 3.53 KB
-- Extension: .ts
-- Lines of code: 105
+## File: pre-commit.sample
+- Path: `/root/git/mas/.git/hooks/pre-commit.sample`
+- Size: 1.60 KB
+- Extension: .sample
+- Lines of code: 40
 
-```ts
-import colors from "colors";
-import zod from "zod";
+```sample
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git commit" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message if
+# it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-commit".
 
-import { BaseCommand } from "../types/command";
-import { DocumentationService } from "../services/serviceDocumentation/ServiceDocumentation";
-import { withFallback } from "../types/zod";
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+	# Initial commit: diff against an empty tree object
+	against=$(git hash-object -t tree /dev/null)
+fi
 
-export interface ICommandOptionsDoc {
-  pattern: string;
-  output: string;
-  exclude: string[];
-  compress: boolean;
-  maxSize: string;
-}
+# If you want to allow non-ASCII filenames set this variable to true.
+allownonascii=$(git config --type=bool hooks.allownonascii)
 
-export class CommandDoc extends BaseCommand<ICommandOptionsDoc> {
-  public static readonly DEFAULT_CONFIG: ICommandOptionsDoc = {
-    pattern: "\\.ts$",
-    output: "documentation.md",
-    exclude: ["node_modules", "dist"],
-    compress: false,
-    maxSize: "1MB"
-  };
+# Redirect output to stderr.
+exec 1>&2
 
-  public readonly SCHEMA = zod.object({
-    pattern: withFallback(zod.string(), CommandDoc.DEFAULT_CONFIG.pattern),
-    output: withFallback(zod.string(), CommandDoc.DEFAULT_CONFIG.output),
-    exclude: withFallback(
-      zod.array(zod.string()),
-      CommandDoc.DEFAULT_CONFIG.exclude
-    ),
-    compress: withFallback(zod.boolean(), CommandDoc.DEFAULT_CONFIG.compress),
-    maxSize: withFallback(zod.string(), CommandDoc.DEFAULT_CONFIG.maxSize)
-  });
+# Cross platform projects tend to avoid non-ASCII filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+	# Note that the use of brackets around a tr range is ok here, (it's
+	# even required, for portability to Solaris 10's /usr/bin/tr), since
+	# the square bracket bytes happen to fall in the designated range.
+	test $(git diff --cached --name-only --diff-filter=A -z $against |
+	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+	cat <<\EOF
+Error: Attempt to add a non-ASCII file name.
 
-  public constructor() {
-    super("doc");
-  }
+This can cause problems if you want to work with people on other platforms.
 
-  public async execute(options: Partial<ICommandOptionsDoc>): Promise<void> {
-    try {
-      console.log(colors.cyan("\nGenerating documentation..."));
+To be portable it is advisable to rename the file.
 
-      // Use .strip() to remove invalid fields and use defaults
-      const parsedOptions = this.SCHEMA.strip().parse(options);
+If you know what you are doing you can disable this check using:
 
-      const documentationService = new DocumentationService({
-        pattern: new RegExp(parsedOptions.pattern),
-        outputPath: parsedOptions.output,
-        excludePatterns: parsedOptions.exclude,
-        compress: parsedOptions.compress,
-        maxFileSize: CommandDoc.parseMaxSize(parsedOptions.maxSize),
-        rootDir: process.cwd(),
-        ignoreHidden: true
-      });
+  git config hooks.allownonascii true
+EOF
+	exit 1
+fi
 
-      await documentationService.run();
-
-      console.log(colors.green("\nDocumentation generated successfully!"));
-      console.log(colors.cyan(`Output file: ${parsedOptions.output}\n`));
-    } catch (error: unknown) {
-      console.error(
-        colors.red("\nError generating documentation:"),
-        (error as Error).message
-      );
-      throw error;
-    }
-  }
-
-  public static parseMaxSize(size: string): number {
-    const units = { B: 1, KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 };
-    const match = size.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/i);
-
-    if (!match) {
-      throw new Error(
-        "Invalid size format. Use format: number + unit (e.g., 1MB)"
-      );
-    }
-
-    const [, value, unit] = match;
-    if (!unit) {
-      throw new Error("Unit is required");
-    }
-    if (!value) {
-      throw new Error("Value is required");
-    }
-    return parseFloat(value) * units[unit.toUpperCase() as keyof typeof units];
-  }
-  protected configure(): void {
-    this.command
-      .description("Generate documentation for the current project")
-      .option(
-        "-p, --pattern <pattern>",
-        "File pattern to match (e.g., \\.ts$)",
-        CommandDoc.DEFAULT_CONFIG.pattern
-      )
-      .option(
-        "-o, --output <path>",
-        "Output file path",
-        CommandDoc.DEFAULT_CONFIG.output
-      )
-      .option(
-        "-e, --exclude <patterns...>",
-        "Patterns to exclude",
-        CommandDoc.DEFAULT_CONFIG.exclude
-      )
-      .option(
-        "-c, --compress",
-        "Compress output by removing empty lines and comments",
-        CommandDoc.DEFAULT_CONFIG.compress
-      )
-      .option(
-        "-s, --max-size <size>",
-        "Maximum file size to process (e.g., 1MB)",
-        CommandDoc.DEFAULT_CONFIG.maxSize
-      );
-  }
-}
+# If there are whitespace errors, print the offending file names and fail.
+exec git diff-index --check --cached $against --
 
 ```
 
 ---------------------------------------------------------------------------
 
-## File: CommandExit.ts
-- Path: `/root/git/mas/src/command/CommandExit.ts`
-- Size: 591.00 B
-- Extension: .ts
-- Lines of code: 20
-
-```ts
-import { BaseCommand } from "../types/command";
-import zod from "zod";
-
-export interface ICommandOptionsExit {
-  message?: string;
-}
-
-export class CommandExit extends BaseCommand<ICommandOptionsExit> {
-  public readonly SCHEMA = zod.object({
-    message: zod.string().default("Thank you for using MAS CLI. Goodbye!")
-  });
-
-  public constructor() {
-    super("exit");
-  }
-
-  public execute(options: ICommandOptionsExit): void {
-    console.log(this.SCHEMA.parse(options).message);
-    process.exit(0);
-  }
-
-  protected configure(): void {
-    this.command.description("Exit the CLI");
-  }
-}
-
-```
-
----------------------------------------------------------------------------
-
-## File: CommandList.ts
-- Path: `/root/git/mas/src/command/CommandList.ts`
-- Size: 2.44 KB
-- Extension: .ts
-- Lines of code: 77
-
-```ts
-import colors from "colors";
-import { readdirSync, statSync } from "fs";
-import { join } from "path";
-import zod from "zod";
-
-import { BaseCommand } from "../types/command";
-
-interface IFileInfo {
-  name: string;
-  isDirectory: boolean;
-  size: number;
-  lastModified: Date;
-}
-
-export interface ICommandOptionsList {
-  all: boolean;
-}
-
-export class CommandList extends BaseCommand<ICommandOptionsList> {
-  public static readonly DEFAULT_CONFIG: ICommandOptionsList = {
-    all: false
-  };
-
-  public readonly SCHEMA = zod.object({
-    all: zod.boolean().default(CommandList.DEFAULT_CONFIG.all)
-  });
-
-  public constructor() {
-    super("list");
-  }
-
-  public execute(options: Partial<ICommandOptionsList>): void {
-    try {
-      const currentDir = process.cwd();
-      const files = readdirSync(currentDir);
-
-      const fileInfos = files
-        .filter(file => options.all || !file.startsWith("."))
-        .map(file => CommandList.getFileInfo(join(currentDir, file)))
-        .sort((a, b) => {
-          if (a.isDirectory !== b.isDirectory) {
-            return a.isDirectory ? -1 : 1;
-          }
-          return a.name.localeCompare(b.name);
-        });
-
-      console.log(colors.cyan("\nCurrent directory contents:\n"));
-
-      const output = fileInfos.map(file => {
-        const name = file.isDirectory
-          ? colors.blue(`${file.name}/`)
-          : file.name;
-
-        return `${name.padEnd(40)} ${colors.yellow(
-          CommandList.formatSize(file.size).padEnd(10)
-        )} ${colors.green(file.lastModified.toLocaleDateString())}`;
-      });
-
-      console.log(output.join("\n"));
-      console.log(colors.cyan(`\nTotal: ${fileInfos.length} items\n`));
-    } catch (error) {
-      console.error(colors.red("Error listing files:"), error);
-    }
-  }
-
-  public static formatSize(size: number): string {
-    const units = ["B", "KB", "MB", "GB"];
-    let unitIndex = 0;
-    let fileSize = size;
-
-    while (fileSize >= 1024 && unitIndex < units.length - 1) {
-      fileSize /= 1024;
-      unitIndex++;
-    }
-
-    return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
-  }
-
-  public static getFileInfo(filePath: string): IFileInfo {
-    const stats = statSync(filePath);
-    return {
-      name: filePath,
-      isDirectory: stats.isDirectory(),
-      size: stats.size,
-      lastModified: stats.mtime
-    };
-  }
-  protected configure(): void {
-    this.command
-      .description("List files in the current directory")
-      .option("-a, --all", "Show hidden files", false);
-  }
-}
-
-```
-
----------------------------------------------------------------------------
-
-## File: MasCLI.ts
-- Path: `/root/git/mas/src/command/MasCLI.ts`
-- Size: 4.25 KB
-- Extension: .ts
-- Lines of code: 140
-
-```ts
-import { Command } from "commander";
-import colors from "colors";
-import inquirer from "inquirer";
-
-import { CommandList } from "./CommandList";
-import { CommandExit } from "./CommandExit";
-import { CommandDoc } from "./CommandDoc";
-
-import { IBaseCommand, CommandRegistry } from "../types/command";
-export class MasCLI {
-  private program: Command;
-  private commandRegistry: CommandRegistry;
-
-  public constructor() {
-    this.program = new Command();
-    this.commandRegistry = new Map();
-    this.initialize();
-  }
-
-  public async run(): Promise<void> {
-    try {
-      if (process.argv.length <= 2) {
-        await this.showInteractiveMenu();
-      } else {
-        this.program.parse(process.argv);
-
-        await this.showInteractiveMenu(false);
-      }
-    } catch (error) {
-      console.error(colors.red("An error occurred:"), error);
-      process.exit(1);
-    }
-  }
-
-  private initialize(): void {
-    this.program
-      .name("mas")
-      .description("CLI automation tools for developers")
-      .version("0.0.1");
-
-    // Register all commands
-    this.registerCommand<{ all: boolean }>(new CommandList());
-    this.registerCommand(new CommandDoc());
-    this.registerCommand(new CommandExit());
-
-    // Add help text for when no command is provided
-    this.program.on("command:*", () => {
-      console.error(
-        colors.red(
-          "Invalid command: %s\nSee --help for a list of available commands."
-        ),
-        this.program.args.join(" ")
-      );
-      this.showInteractiveMenu();
-    });
-  }
-
-  private registerCommand<T>(command: IBaseCommand<T>): void {
-    this.commandRegistry.set(command.command.name(), {
-      SCHEMA: command.SCHEMA,
-      command: command.command,
-      execute: command.execute as (options: unknown) => Promise<void>
-    });
-    this.program.addCommand(command.command);
-  }
-
-  private async showInteractiveMenu(withHello: boolean = true): Promise<void> {
-    if (withHello) {
-      console.log(
-        colors.yellow(
-          "\nWelcome to MAS CLI - Your Development Workflow Assistant\n"
-        )
-      );
-    }
-
-    const choices = Array.from(this.commandRegistry.entries()).map(
-      ([name, info]) => ({
-        name: `${colors.cyan(name.padEnd(15))} ${info.command.description()}`,
-        value: name
-      })
-    );
-
-    const { selectedCommand } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "selectedCommand",
-        message: "Please select a command to execute:",
-        choices,
-        pageSize: 10
-      }
-    ]);
-
-    const commandInfo = this.commandRegistry.get(selectedCommand);
-    if (commandInfo) {
-      const { command } = commandInfo;
-
-      try {
-        // If command needs additional options, prompt for them
-        if (command.options.length > 0) {
-          const options = await this.promptCommandOptions(command);
-          await commandInfo.execute?.(options);
-
-          await this.showInteractiveMenu(false);
-        } else {
-          await commandInfo.execute?.({});
-        }
-
-        const { shouldContinue } = await inquirer.prompt([
-          {
-            type: "confirm",
-            name: "shouldContinue",
-            message: "Do you want to continue?",
-            default: true
-          }
-        ]);
-
-        if (!shouldContinue) {
-          console.log(
-            colors.yellow("\nThank you for using MAS CLI. Goodbye!\n")
-          );
-          process.exit(0);
-        }
-      } catch (error) {
-        console.error(
-          colors.red("\nAn error occurred while executing the command:"),
-          error
-        );
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Pause to show error
-      }
-    }
-  }
-
-  private async promptCommandOptions(
-    command: Command
-  ): Promise<ReturnType<typeof inquirer.prompt>> {
-    const questions = command.options.map(option => {
-      const question: {
-        [x: string]: any;
-      } = {
-        name: option.attributeName(),
-        message: option.description
-      };
-
-      if (option.mandatory) {
-        question["type"] = "input";
-        question["validate"] = (input: string) => input.length > 0;
-      } else {
-        question["type"] = "confirm";
-        question["default"] = option.defaultValue;
-      }
-
-      return question;
-    });
-
-    return inquirer.prompt(
-      questions as {
-        [x: string]: any;
-      }
-    );
-  }
-}
-
-```
-
----------------------------------------------------------------------------
-
-## File: command.ts
-- Path: `/root/git/mas/src/types/command.ts`
-- Size: 796.00 B
-- Extension: .ts
-- Lines of code: 23
-
-```ts
-import { Command } from "commander";
-import zod from "zod";
-
-export interface IBaseCommand<T> {
-  SCHEMA: zod.ZodObject<zod.ZodRawShape>;
-  command: Command;
-  execute: (options: T) => Promise<void> | void;
-}
-
-export abstract class BaseCommand<T> implements IBaseCommand<T> {
-  abstract readonly SCHEMA: zod.ZodObject<zod.ZodRawShape>;
-  public readonly command: Command;
-
-  public constructor(name: string) {
-    this.command = new Command(name);
-    this.configure();
-  }
-
-  public abstract execute(options: Partial<T>): Promise<void> | void;
-  protected abstract configure(): void;
-}
-
-export interface ICommandInfo<T> {
-  SCHEMA: zod.ZodObject<zod.ZodRawShape>;
-  command: Command;
-  execute: (options: T) => Promise<void>;
-}
-
-export type CommandRegistry = Map<string, ICommandInfo<unknown>>;
-
-```
-
----------------------------------------------------------------------------
-
-## File: zod.ts
-- Path: `/root/git/mas/src/types/zod.ts`
-- Size: 400.00 B
-- Extension: .ts
+## File: pre-merge-commit.sample
+- Path: `/root/git/mas/.git/hooks/pre-merge-commit.sample`
+- Size: 416.00 B
+- Extension: .sample
 - Lines of code: 12
 
-```ts
-import zod from "zod";
+```sample
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git merge" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message to
+# stderr if it wants to stop the merge commit.
+#
+# To enable this hook, rename this file to "pre-merge-commit".
 
-type Parser<T> = (value: unknown) => T;
-const customSchema = <T>(parser: Parser<T>) => zod.unknown().transform(parser);
-
-const withFallback = <T>(schema: zod.ZodType<T>, fallback: NonNullable<T>) =>
-  customSchema(val => {
-    const parsed = schema.safeParse(val);
-    if (parsed.success) {
-      return parsed.data;
-    }
-    return fallback;
-  });
-
-export { withFallback };
+. git-sh-setup
+test -x "$GIT_DIR/hooks/pre-commit" &&
+        exec "$GIT_DIR/hooks/pre-commit"
+:
 
 ```
 
 ---------------------------------------------------------------------------
 
-## File: ServiceContent.ts
-- Path: `/root/git/mas/src/services/serviceDocumentation/ServiceContent.ts`
-- Size: 1.37 KB
-- Extension: .ts
-- Lines of code: 41
+## File: pre-push.sample
+- Path: `/root/git/mas/.git/hooks/pre-push.sample`
+- Size: 1.34 KB
+- Extension: .sample
+- Lines of code: 47
 
-```ts
-import { IFileInfo } from "./types";
-import { FileSystemService } from "../serviceFileSystem";
-import * as path from "path";
+```sample
+#!/bin/sh
 
-export class ContentService {
-  constructor(
-    private readonly fileSystemService: FileSystemService,
-    private readonly compress: boolean
-  ) {}
+# An example hook script to verify what is about to be pushed.  Called by "git
+# push" after it has checked the remote status, but before anything has been
+# pushed.  If this script exits with a non-zero status nothing will be pushed.
+#
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+#
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local oid> <remote ref> <remote oid>
+#
+# This sample shows how to prevent push of commits where the log message starts
+# with "WIP" (work in progress).
 
-  public async generateFileInfo(filePath: string): Promise<IFileInfo> {
-    const stats = await this.fileSystemService.getFileStats(filePath);
-    const content = await this.fileSystemService.readFileContent(filePath);
+remote="$1"
+url="$2"
 
-    return {
-      name: path.basename(filePath),
-      path: filePath,
-      content: this.compress ? this.compressContent(content) : content,
-      ext: path.extname(filePath),
-      size: stats.size,
-      lines: content.split("\n").filter((line: string) => line.trim() !== "")
-        .length
-    };
-  }
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
 
-  public formatContentWithLineNumbers(content: string): string {
-    const lines = content.split("\n");
-    const lineNumberWidth = lines.length.toString().length;
+while read local_ref local_oid remote_ref remote_oid
+do
+	if test "$local_oid" = "$zero"
+	then
+		# Handle delete
+		:
+	else
+		if test "$remote_oid" = "$zero"
+		then
+			# New branch, examine all commits
+			range="$local_oid"
+		else
+			# Update to existing branch, examine new commits
+			range="$remote_oid..$local_oid"
+		fi
 
-    return lines
-      .map((line, index) => {
-        const lineNumber = (index + 1)
-          .toString()
-          .padStart(lineNumberWidth, " ");
-        return `${lineNumber} | ${line}`;
-      })
-      .join("\n");
-  }
+		# Check for WIP commit
+		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
+		if test -n "$commit"
+		then
+			echo >&2 "Found WIP commit in $local_ref, not pushing"
+			exit 1
+		fi
+	fi
+done
 
-  private compressContent(content: string): string {
-    return content
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line !== "" && !line.startsWith("//"))
-      .join("\n");
-  }
-}
-
-```
-
----------------------------------------------------------------------------
-
-## File: ServiceDocumentation.ts
-- Path: `/root/git/mas/src/services/serviceDocumentation/ServiceDocumentation.ts`
-- Size: 2.58 KB
-- Extension: .ts
-- Lines of code: 72
-
-```ts
-import { IDocumentationConfig, IFileInfo } from "./types";
-import { FileSystemService } from "../serviceFileSystem";
-import { TreeService } from "./ServiceTree";
-import { ContentService } from "./ServiceContent";
-import { MarkdownService } from "./ServiceMarkdown";
-
-export class DocumentationService {
-  public static readonly DEFAULT_CONFIG: IDocumentationConfig = {
-    pattern: /.*/,
-    rootDir: process.cwd(),
-    outputPath: "documentation.md",
-    excludePatterns: ["node_modules/**", "**/dist/**", "**/*.test.ts"],
-    maxFileSize: 1024 * 1024,
-    ignoreHidden: true,
-    compress: false
-  };
-
-  private readonly fileSystemService: FileSystemService;
-  private readonly treeService: TreeService;
-  private readonly contentService: ContentService;
-  private readonly markdownService: MarkdownService;
-  private readonly config: IDocumentationConfig;
-
-  public constructor(config: Partial<IDocumentationConfig> = {}) {
-    this.config = { ...DocumentationService.DEFAULT_CONFIG, ...config };
-
-    console.log(this.config);
-    this.fileSystemService = new FileSystemService(
-      this.config.maxFileSize,
-      this.config.excludePatterns,
-      this.config.ignoreHidden,
-      this.config.pattern
-    );
-
-    this.treeService = new TreeService(this.fileSystemService);
-
-    this.contentService = new ContentService(
-      this.fileSystemService,
-      this.config.compress
-    );
-
-    this.markdownService = new MarkdownService();
-  }
-
-  public async run(): Promise<void> {
-    try {
-      const files: IFileInfo[] = [];
-      const rootNode = await this.treeService.createTreeNode(
-        this.config.rootDir,
-        ""
-      );
-
-      if (!rootNode) {
-        throw new Error("Root directory not found");
-      }
-
-      const queue = [this.config.rootDir];
-      while (queue.length > 0) {
-        const currentPath = queue.shift();
-        if (!currentPath) continue;
-
-        const stats = await this.fileSystemService.getFileStats(currentPath);
-
-        if (stats.isDirectory()) {
-          const entries =
-            await this.fileSystemService.readDirectory(currentPath);
-          queue.push(...entries);
-        } else if (
-          this.fileSystemService.shouldIncludeFile(currentPath, stats.size)
-        ) {
-          files.push(await this.contentService.generateFileInfo(currentPath));
-        }
-      }
-
-      const treeContent = this.treeService.renderTree(rootNode);
-      const markdown = this.markdownService.generateMarkdown(
-        files,
-        treeContent
-      );
-      await this.fileSystemService.writeFile(this.config.outputPath, markdown);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-}
+exit 0
 
 ```
 
 ---------------------------------------------------------------------------
 
-## File: ServiceMarkdown.ts
-- Path: `/root/git/mas/src/services/serviceDocumentation/ServiceMarkdown.ts`
-- Size: 1.22 KB
-- Extension: .ts
-- Lines of code: 41
+## File: pre-rebase.sample
+- Path: `/root/git/mas/.git/hooks/pre-rebase.sample`
+- Size: 4.78 KB
+- Extension: .sample
+- Lines of code: 138
 
-```ts
-import { IFileInfo } from "./types";
+```sample
+#!/bin/sh
+#
+# Copyright (c) 2006, 2008 Junio C Hamano
+#
+# The "pre-rebase" hook is run just before "git rebase" starts doing
+# its job, and can prevent the command from running by exiting with
+# non-zero status.
+#
+# The hook is called with the following parameters:
+#
+# $1 -- the upstream the series was forked from.
+# $2 -- the branch being rebased (or empty when rebasing the current branch).
+#
+# This sample shows how to prevent topic branches that are already
+# merged to 'next' branch from getting rebased, because allowing it
+# would result in rebasing already published history.
 
-export class MarkdownService {
-  generateMarkdown(files: IFileInfo[], treeContent: string): string {
-    const header = this.generateHeader(files.length, treeContent);
-    const filesSections = files
-      .map(file => this.generateFileSection(file))
-      .join("\n");
-    return header + filesSections;
-  }
+publish=next
+basebranch="$1"
+if test "$#" = 2
+then
+	topic="refs/heads/$2"
+else
+	topic=`git symbolic-ref HEAD` ||
+	exit 0 ;# we do not interrupt rebasing detached HEAD
+fi
 
-  private generateHeader(totalFiles: number, treeContent: string): string {
-    return `# Code Documentation
-Generated on: ${new Date().toISOString()}
-Total files: ${totalFiles}
+case "$topic" in
+refs/heads/??/*)
+	;;
+*)
+	exit 0 ;# we do not interrupt others.
+	;;
+esac
 
-## Project Structure
+# Now we are dealing with a topic branch being rebased
+# on top of master.  Is it OK to rebase it?
 
-\`\`\`
-${treeContent}
-\`\`\`\n`;
-  }
-
-  private generateFileSection(file: IFileInfo): string {
-    return `
-## File: ${file.name}
-- Path: \`${file.path}\`
-- Size: ${this.formatSize(file.size)}
-- Extension: ${file.ext}
-- Lines of code: ${file.lines}
-
-\`\`\`${file.ext.slice(1) || "plaintext"}
-${file.content}
-\`\`\`
-
----------------------------------------------------------------------------`;
-  }
-
-  private formatSize(bytes: number): string {
-    const units = ["B", "KB", "MB", "GB"];
-    let size = bytes;
-    let unitIndex = 0;
-
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-
-    return `${size.toFixed(2)} ${units[unitIndex]}`;
-  }
+# Does the topic really exist?
+git show-ref -q "$topic" || {
+	echo >&2 "No such branch $topic"
+	exit 1
 }
+
+# Is topic fully merged to master?
+not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
+if test -z "$not_in_master"
+then
+	echo >&2 "$topic is fully merged to master; better remove it."
+	exit 1 ;# we could allow it, but there is no point.
+fi
+
+# Is topic ever merged to next?  If so you should not be rebasing it.
+only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
+only_next_2=`git rev-list ^master           ${publish} | sort`
+if test "$only_next_1" = "$only_next_2"
+then
+	not_in_topic=`git rev-list "^$topic" master`
+	if test -z "$not_in_topic"
+	then
+		echo >&2 "$topic is already up to date with master"
+		exit 1 ;# we could allow it, but there is no point.
+	else
+		exit 0
+	fi
+else
+	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
+	/usr/bin/perl -e '
+		my $topic = $ARGV[0];
+		my $msg = "* $topic has commits already merged to public branch:\n";
+		my (%not_in_next) = map {
+			/^([0-9a-f]+) /;
+			($1 => 1);
+		} split(/\n/, $ARGV[1]);
+		for my $elem (map {
+				/^([0-9a-f]+) (.*)$/;
+				[$1 => $2];
+			} split(/\n/, $ARGV[2])) {
+			if (!exists $not_in_next{$elem->[0]}) {
+				if ($msg) {
+					print STDERR $msg;
+					undef $msg;
+				}
+				print STDERR " $elem->[1]\n";
+			}
+		}
+	' "$topic" "$not_in_next" "$not_in_master"
+	exit 1
+fi
+
+<<\DOC_END
+
+This sample hook safeguards topic branches that have been
+published from being rewound.
+
+The workflow assumed here is:
+
+ * Once a topic branch forks from "master", "master" is never
+   merged into it again (either directly or indirectly).
+
+ * Once a topic branch is fully cooked and merged into "master",
+   it is deleted.  If you need to build on top of it to correct
+   earlier mistakes, a new topic branch is created by forking at
+   the tip of the "master".  This is not strictly necessary, but
+   it makes it easier to keep your history simple.
+
+ * Whenever you need to test or publish your changes to topic
+   branches, merge them into "next" branch.
+
+The script, being an example, hardcodes the publish branch name
+to be "next", but it is trivial to make it configurable via
+$GIT_DIR/config mechanism.
+
+With this workflow, you would want to know:
+
+(1) ... if a topic branch has ever been merged to "next".  Young
+    topic branches can have stupid mistakes you would rather
+    clean up before publishing, and things that have not been
+    merged into other branches can be easily rebased without
+    affecting other people.  But once it is published, you would
+    not want to rewind it.
+
+(2) ... if a topic branch has been fully merged to "master".
+    Then you can delete it.  More importantly, you should not
+    build on top of it -- other people may already want to
+    change things related to the topic as patches against your
+    "master", so if you need further changes, it is better to
+    fork the topic (perhaps with the same name) afresh from the
+    tip of "master".
+
+Let's look at this example:
+
+		   o---o---o---o---o---o---o---o---o---o "next"
+		  /       /           /           /
+		 /   a---a---b A     /           /
+		/   /               /           /
+	       /   /   c---c---c---c B         /
+	      /   /   /             \         /
+	     /   /   /   b---b C     \       /
+	    /   /   /   /             \     /
+    ---o---o---o---o---o---o---o---o---o---o---o "master"
+
+
+A, B and C are topic branches.
+
+ * A has one fix since it was merged up to "next".
+
+ * B has finished.  It has been fully merged up to "master" and "next",
+   and is ready to be deleted.
+
+ * C has not merged to "next" at all.
+
+We would want to allow C to be rebased, refuse A, and encourage
+B to be deleted.
+
+To compute (1):
+
+	git rev-list ^master ^topic next
+	git rev-list ^master        next
+
+	if these match, topic has not merged in next at all.
+
+To compute (2):
+
+	git rev-list master..topic
+
+	if this is empty, it is fully merged to "master".
+
+DOC_END
+
+```
+
+---------------------------------------------------------------------------
+
+## File: pre-receive.sample
+- Path: `/root/git/mas/.git/hooks/pre-receive.sample`
+- Size: 544.00 B
+- Extension: .sample
+- Lines of code: 23
+
+```sample
+#!/bin/sh
+#
+# An example hook script to make use of push options.
+# The example simply echoes all push options that start with 'echoback='
+# and rejects all pushes when the "reject" push option is used.
+#
+# To enable this hook, rename this file to "pre-receive".
+
+if test -n "$GIT_PUSH_OPTION_COUNT"
+then
+	i=0
+	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
+	do
+		eval "value=\$GIT_PUSH_OPTION_$i"
+		case "$value" in
+		echoback=*)
+			echo "echo from the pre-receive-hook: ${value#*=}" >&2
+			;;
+		reject)
+			exit 1
+		esac
+		i=$((i + 1))
+	done
+fi
+
+```
+
+---------------------------------------------------------------------------
+
+## File: prepare-commit-msg.sample
+- Path: `/root/git/mas/.git/hooks/prepare-commit-msg.sample`
+- Size: 1.46 KB
+- Extension: .sample
+- Lines of code: 37
+
+```sample
+#!/bin/sh
+#
+# An example hook script to prepare the commit log message.
+# Called by "git commit" with the name of the file that has the
+# commit message, followed by the description of the commit
+# message's source.  The hook's purpose is to edit the commit
+# message file.  If the hook fails with a non-zero status,
+# the commit is aborted.
+#
+# To enable this hook, rename this file to "prepare-commit-msg".
+
+# This hook includes three examples. The first one removes the
+# "# Please enter the commit message..." help message.
+#
+# The second includes the output of "git diff --name-status -r"
+# into the message, just before the "git status" output.  It is
+# commented because it doesn't cope with --amend or with squashed
+# commits.
+#
+# The third example adds a Signed-off-by line to the message, that can
+# still be edited.  This is rarely a good idea.
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+SHA1=$3
+
+/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
+
+# case "$COMMIT_SOURCE,$SHA1" in
+#  ,|template,)
+#    /usr/bin/perl -i.bak -pe '
+#       print "\n" . `git diff --cached --name-status -r`
+# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
+#  *) ;;
+# esac
+
+# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
+# if test -z "$COMMIT_SOURCE"
+# then
+#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
+# fi
+
+```
+
+---------------------------------------------------------------------------
+
+## File: master
+- Path: `/root/git/mas/.git/refs/heads/master`
+- Size: 41.00 B
+- Extension: 
+- Lines of code: 1
+
+```plaintext
+d6086da619d63a0ed59b1b466b10a6a2a34f4e5b
 
 ```
 
@@ -881,139 +567,48 @@ export class TreeService {
 
 ---------------------------------------------------------------------------
 
-## File: index.ts
-- Path: `/root/git/mas/src/services/serviceDocumentation/index.ts`
-- Size: 0.00 B
-- Extension: .ts
-- Lines of code: 0
+## File: master
+- Path: `/root/git/mas/.git/logs/refs/heads/master`
+- Size: 898.00 B
+- Extension: 
+- Lines of code: 5
 
-```ts
-
-```
-
----------------------------------------------------------------------------
-
-## File: types.ts
-- Path: `/root/git/mas/src/services/serviceDocumentation/types.ts`
-- Size: 590.00 B
-- Extension: .ts
-- Lines of code: 31
-
-```ts
-export interface IDocumentationConfig {
-  pattern: RegExp;
-  rootDir: string;
-  outputPath: string;
-  excludePatterns: string[];
-  maxFileSize: number;
-  ignoreHidden: boolean;
-  compress: boolean;
-}
-
-export interface ICommandOptionsDoc {
-  name: string;
-  path: string;
-  content: string;
-  ext: string;
-  size: number;
-  lines: number;
-}
-
-export interface ITreeNode {
-  name: string;
-  path: string;
-  type: "file" | "directory";
-  children: ITreeNode[];
-}
-
-export interface IFileInfo {
-  name: string;
-  path: string;
-  content: string;
-  ext: string;
-  size: number;
-  lines: number;
-}
+```plaintext
+0000000000000000000000000000000000000000 9b396108ab1b5094afcd2f547385f99195fd3919 aminesayagh <aminesayagh1997@gmail.com> 1734164517 +0000	commit (initial): init repertory
+9b396108ab1b5094afcd2f547385f99195fd3919 cf7a3c90f5bbd02d6692329d3f02f56b38388004 aminesayagh <aminesayagh1997@gmail.com> 1734166434 +0000	commit: create find command for testing
+cf7a3c90f5bbd02d6692329d3f02f56b38388004 632c379e23a6a931789c246119a9b0f0b746029b aminesayagh <aminesayagh1997@gmail.com> 1734170246 +0000	commit: add list command, and implement menu experience
+632c379e23a6a931789c246119a9b0f0b746029b f23c36f9213284e59990cdefb28b60564a19695f aminesayagh <aminesayagh1997@gmail.com> 1734173780 +0000	commit: doc repo
+f23c36f9213284e59990cdefb28b60564a19695f d6086da619d63a0ed59b1b466b10a6a2a34f4e5b aminesayagh <aminesayagh1997@gmail.com> 1734378095 +0000	commit: add code documentation functionality to the code
 
 ```
 
 ---------------------------------------------------------------------------
 
-## File: FileSystemService.ts
-- Path: `/root/git/mas/src/services/serviceFileSystem/FileSystemService.ts`
-- Size: 1.55 KB
-- Extension: .ts
-- Lines of code: 46
-
-```ts
-import * as fs from "fs/promises";
-import { Stats } from "fs";
-import * as path from "path";
-
-export class FileSystemService {
-  constructor(
-    private readonly maxFileSize: number,
-    private readonly excludePatterns: string[],
-    private readonly ignoreHidden: boolean,
-    private readonly pattern: RegExp
-  ) {}
-
-  async readDirectory(dirPath: string): Promise<string[]> {
-    const entries = await fs.readdir(dirPath);
-    return entries.map(entry => path.join(dirPath, entry));
-  }
-
-  async getFileStats(filePath: string): Promise<Stats> {
-    return await fs.stat(filePath);
-  }
-
-  async readFileContent(filePath: string): Promise<string> {
-    return await fs.readFile(filePath, "utf-8");
-  }
-
-  async writeFile(filePath: string, content: string): Promise<void> {
-    await fs.writeFile(filePath, content, "utf-8");
-  }
-
-  public shouldInclude(filePath: string): boolean {
-    if (this.ignoreHidden && this.isHidden(filePath)) return false;
-    return !this.excludePatterns.some(pattern =>
-      new RegExp(pattern.replace(/\*/g, ".*")).test(filePath)
-    );
-  }
-
-  public isWithinSizeLimit(size: number): boolean {
-    return size <= this.maxFileSize;
-  }
-
-  public shouldIncludeFile(filePath: string, size: number): boolean {
-    return (
-      !this.isHidden(filePath) &&
-      this.pattern.test(filePath) &&
-      size <= this.maxFileSize &&
-      !this.excludePatterns.some(pattern =>
-        new RegExp(pattern.replace(/\*/g, ".*")).test(filePath)
-      )
-    );
-  }
-
-  private isHidden(filePath: string): boolean {
-    return path.basename(filePath).startsWith(".");
-  }
-}
-
-```
-
----------------------------------------------------------------------------
-
-## File: index.ts
-- Path: `/root/git/mas/src/services/serviceFileSystem/index.ts`
-- Size: 57.00 B
-- Extension: .ts
+## File: master
+- Path: `/root/git/mas/.git/refs/remotes/origin/master`
+- Size: 41.00 B
+- Extension: 
 - Lines of code: 1
 
-```ts
-export { FileSystemService } from "./FileSystemService";
+```plaintext
+d6086da619d63a0ed59b1b466b10a6a2a34f4e5b
+
+```
+
+---------------------------------------------------------------------------
+
+## File: master
+- Path: `/root/git/mas/.git/logs/refs/remotes/origin/master`
+- Size: 770.00 B
+- Extension: 
+- Lines of code: 5
+
+```plaintext
+0000000000000000000000000000000000000000 9b396108ab1b5094afcd2f547385f99195fd3919 aminesayagh <aminesayagh1997@gmail.com> 1734164524 +0000	update by push
+9b396108ab1b5094afcd2f547385f99195fd3919 cf7a3c90f5bbd02d6692329d3f02f56b38388004 aminesayagh <aminesayagh1997@gmail.com> 1734166439 +0000	update by push
+cf7a3c90f5bbd02d6692329d3f02f56b38388004 632c379e23a6a931789c246119a9b0f0b746029b aminesayagh <aminesayagh1997@gmail.com> 1734170250 +0000	update by push
+632c379e23a6a931789c246119a9b0f0b746029b f23c36f9213284e59990cdefb28b60564a19695f aminesayagh <aminesayagh1997@gmail.com> 1734173782 +0000	update by push
+f23c36f9213284e59990cdefb28b60564a19695f d6086da619d63a0ed59b1b466b10a6a2a34f4e5b aminesayagh <aminesayagh1997@gmail.com> 1734378097 +0000	update by push
 
 ```
 

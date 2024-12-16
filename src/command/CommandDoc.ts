@@ -43,7 +43,7 @@ export class CommandDoc extends BaseCommand<ICommandOptionsDoc> {
 
       // Use .strip() to remove invalid fields and use defaults
       const parsedOptions = this.SCHEMA.strip().parse(options);
-
+      console.log("options test :", options);
       const documentationService = new DocumentationService({
         pattern: new RegExp(parsedOptions.pattern),
         outputPath: parsedOptions.output,

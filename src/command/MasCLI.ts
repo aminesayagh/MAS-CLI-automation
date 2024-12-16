@@ -1,3 +1,4 @@
+// src/command/MasCLI.ts
 import { Command } from "commander";
 import colors from "colors";
 import inquirer from "inquirer";
@@ -6,66 +7,53 @@ import { CommandList } from "./CommandList";
 import { CommandExit } from "./CommandExit";
 import { CommandDoc } from "./CommandDoc";
 
-import { IBaseCommand, CommandRegistry } from "../types/command";
+import { CliCommandRegistry } from "./cli/CliCommandRegistry";
+import { CliOptionPrompt } from "./cli/CliOptionPrompt";
+import { CliExecutor } from "./cli/CliExecutor";
+import { ICommandInfo } from "../types/command";
+
+/**
+ * Main CLI application class that orchestrates command registration,
+ * user interaction, and command execution
+ */
 export class MasCLI {
-  private program: Command;
-  private commandRegistry: CommandRegistry;
+  private readonly registry: CliCommandRegistry;
 
   public constructor() {
-    this.program = new Command();
-    this.commandRegistry = new Map();
-    this.initialize();
+    this.registry = new CliCommandRegistry(new Command());
+    this.registerCommands();
   }
 
+  /**
+   * Start the CLI application
+   */
   public async run(): Promise<void> {
     try {
-      if (process.argv.length <= 2) {
-        await this.showInteractiveMenu();
-      } else {
-        this.program.parse(process.argv);
-
-        await this.showInteractiveMenu(false);
-      }
+      const isInteractive = process.argv.length <= 2;
+      await this.showInteractiveMenu(isInteractive);
     } catch (error) {
       console.error(colors.red("An error occurred:"), error);
       process.exit(1);
     }
   }
 
-  private initialize(): void {
-    this.program
-      .name("mas")
-      .description("CLI automation tools for developers")
-      .version("0.0.1");
-
-    // Register all commands
-    this.registerCommand<{ all: boolean }>(new CommandList());
-    this.registerCommand(new CommandDoc());
-    this.registerCommand(new CommandExit());
-
-    // Add help text for when no command is provided
-    this.program.on("command:*", () => {
-      console.error(
-        colors.red(
-          "Invalid command: %s\nSee --help for a list of available commands."
-        ),
-        this.program.args.join(" ")
-      );
-      this.showInteractiveMenu();
-    });
+  /**
+   * Register all available CLI commands
+   */
+  private registerCommands(): void {
+    this.registry.registerCommand(new CommandList());
+    this.registry.registerCommand(new CommandDoc());
+    this.registry.registerCommand(new CommandExit());
   }
 
-  private registerCommand<T>(command: IBaseCommand<T>): void {
-    this.commandRegistry.set(command.command.name(), {
-      SCHEMA: command.SCHEMA,
-      command: command.command,
-      execute: command.execute as (options: unknown) => Promise<void>
-    });
-    this.program.addCommand(command.command);
-  }
-
-  private async showInteractiveMenu(withHello: boolean = true): Promise<void> {
-    if (withHello) {
+  /**
+   * Display interactive menu and handle command execution
+   * @param showWelcome Whether to show welcome message
+   */
+  private async showInteractiveMenu(
+    showWelcome: boolean = true
+  ): Promise<void> {
+    if (showWelcome) {
       console.log(
         colors.yellow(
           "\nWelcome to MAS CLI - Your Development Workflow Assistant\n"
@@ -73,12 +61,25 @@ export class MasCLI {
       );
     }
 
-    const choices = Array.from(this.commandRegistry.entries()).map(
-      ([name, info]) => ({
-        name: `${colors.cyan(name.padEnd(15))} ${info.command.description()}`,
-        value: name
-      })
-    );
+    const command = await this.promptCommand();
+    if (!command) return;
+
+    try {
+      await this.handleCommandExecution(command);
+      await this.promptContinue();
+    } catch (error) {
+      await this.handleError(error);
+    }
+  }
+
+  /**
+   * Prompt user to select a command
+   */
+  private async promptCommand() {
+    const choices = this.registry.getAllCommands().map(([name, info]) => ({
+      name: `${colors.cyan(name.padEnd(15))} ${info.command.description()}`,
+      value: name
+    }));
 
     const { selectedCommand } = await inquirer.prompt([
       {
@@ -90,72 +91,52 @@ export class MasCLI {
       }
     ]);
 
-    const commandInfo = this.commandRegistry.get(selectedCommand);
-    if (commandInfo) {
-      const { command } = commandInfo;
+    return this.registry.getCommand(selectedCommand);
+  }
 
-      try {
-        // If command needs additional options, prompt for them
-        if (command.options.length > 0) {
-          const options = await this.promptCommandOptions(command);
-          await commandInfo.execute?.(options);
+  /**
+   * Handle command execution flow
+   * @param commandInfo Command to execute
+   */
+  private async handleCommandExecution(
+    commandInfo: ICommandInfo<unknown>
+  ): Promise<void> {
+    const options =
+      commandInfo.command.options.length > 0
+        ? await CliOptionPrompt.promptOptions(commandInfo.command)
+        : {};
 
-          await this.showInteractiveMenu(false);
-        } else {
-          await commandInfo.execute?.({});
-        }
+    await CliExecutor.executeCommand(commandInfo, options);
+  }
 
-        const { shouldContinue } = await inquirer.prompt([
-          {
-            type: "confirm",
-            name: "shouldContinue",
-            message: "Do you want to continue?",
-            default: true
-          }
-        ]);
-
-        if (!shouldContinue) {
-          console.log(
-            colors.yellow("\nThank you for using MAS CLI. Goodbye!\n")
-          );
-          process.exit(0);
-        }
-      } catch (error) {
-        console.error(
-          colors.red("\nAn error occurred while executing the command:"),
-          error
-        );
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Pause to show error
+  /**
+   * Prompt user whether to continue using CLI
+   */
+  private async promptContinue(): Promise<void> {
+    const { shouldContinue } = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "shouldContinue",
+        message: "Do you want to continue?",
+        default: true
       }
+    ]);
+
+    if (!shouldContinue) {
+      console.log(colors.yellow("\nThank you for using MAS CLI. Goodbye!\n"));
+      process.exit(0);
     }
   }
 
-  private async promptCommandOptions(
-    command: Command
-  ): Promise<ReturnType<typeof inquirer.prompt>> {
-    const questions = command.options.map(option => {
-      const question: {
-        [x: string]: any;
-      } = {
-        name: option.attributeName(),
-        message: option.description
-      };
-
-      if (option.mandatory) {
-        question["type"] = "input";
-        question["validate"] = (input: string) => input.length > 0;
-      } else {
-        question["type"] = "confirm";
-        question["default"] = option.defaultValue;
-      }
-
-      return question;
-    });
-
-    return inquirer.prompt(
-      questions as {
-        [x: string]: any;
-      }
+  /**
+   * Handle command execution errors
+   * @param error Error that occurred
+   */
+  private async handleError(error: unknown): Promise<void> {
+    console.error(
+      colors.red("\nAn error occurred while executing the command:"),
+      error
     );
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 }

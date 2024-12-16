@@ -84,6 +84,7 @@ export default [
       // TypeScript-specific rules
       "@typescript-eslint/explicit-function-return-type": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-extraneous-class": "off",
       "@typescript-eslint/no-unused-vars": ["error", {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_"

@@ -4,6 +4,7 @@ import zod from "zod";
 import { BaseCommand } from "../types/command";
 import { DocumentationService } from "../services/serviceDocumentation/ServiceDocumentation";
 import { withFallback } from "../types/zod";
+import { FileSystemService } from "../services/serviceFileSystem";
 
 export interface ICommandOptionsDoc {
   pattern: string;
@@ -43,13 +44,12 @@ export class CommandDoc extends BaseCommand<ICommandOptionsDoc> {
 
       // Use .strip() to remove invalid fields and use defaults
       const parsedOptions = this.SCHEMA.strip().parse(options);
-      console.log("options test :", options);
       const documentationService = new DocumentationService({
         pattern: new RegExp(parsedOptions.pattern),
         outputPath: parsedOptions.output,
         excludePatterns: parsedOptions.exclude,
         compress: parsedOptions.compress,
-        maxFileSize: CommandDoc.parseMaxSize(parsedOptions.maxSize),
+        maxFileSize: FileSystemService.parseMaxSize(parsedOptions.maxSize),
         rootDir: process.cwd(),
         ignoreHidden: true
       });
@@ -67,25 +67,6 @@ export class CommandDoc extends BaseCommand<ICommandOptionsDoc> {
     }
   }
 
-  public static parseMaxSize(size: string): number {
-    const units = { B: 1, KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 };
-    const match = size.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/i);
-
-    if (!match) {
-      throw new Error(
-        "Invalid size format. Use format: number + unit (e.g., 1MB)"
-      );
-    }
-
-    const [, value, unit] = match;
-    if (!unit) {
-      throw new Error("Unit is required");
-    }
-    if (!value) {
-      throw new Error("Value is required");
-    }
-    return parseFloat(value) * units[unit.toUpperCase() as keyof typeof units];
-  }
   protected configure(): void {
     this.command
       .description("Generate documentation for the current project")

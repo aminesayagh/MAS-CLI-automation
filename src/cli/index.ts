@@ -2,6 +2,7 @@
 
 import { MasCLI } from "../command/MasCLI";
 import colors from "colors";
+
 async function main(): Promise<void> {
   const mas = new MasCLI();
   await mas.run();

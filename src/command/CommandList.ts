@@ -1,16 +1,10 @@
 import colors from "colors";
-import { readdirSync, statSync } from "fs";
+import { readdirSync } from "fs";
 import { join } from "path";
 import zod from "zod";
 
 import { BaseCommand } from "../types/command";
-
-interface IFileInfo {
-  name: string;
-  isDirectory: boolean;
-  size: number;
-  lastModified: Date;
-}
+import { FileSystemService } from "../services/serviceFileSystem";
 
 export interface ICommandOptionsList {
   all: boolean;
@@ -36,7 +30,7 @@ export class CommandList extends BaseCommand<ICommandOptionsList> {
 
       const fileInfos = files
         .filter(file => options.all || !file.startsWith("."))
-        .map(file => CommandList.getFileInfo(join(currentDir, file)))
+        .map(file => FileSystemService.getFileInfo(join(currentDir, file)))
         .sort((a, b) => {
           if (a.isDirectory !== b.isDirectory) {
             return a.isDirectory ? -1 : 1;
@@ -52,7 +46,7 @@ export class CommandList extends BaseCommand<ICommandOptionsList> {
           : file.name;
 
         return `${name.padEnd(40)} ${colors.yellow(
-          CommandList.formatSize(file.size).padEnd(10)
+          FileSystemService.formatSize(file.size).padEnd(10)
         )} ${colors.green(file.lastModified.toLocaleDateString())}`;
       });
 
@@ -63,28 +57,6 @@ export class CommandList extends BaseCommand<ICommandOptionsList> {
     }
   }
 
-  public static formatSize(size: number): string {
-    const units = ["B", "KB", "MB", "GB"];
-    let unitIndex = 0;
-    let fileSize = size;
-
-    while (fileSize >= 1024 && unitIndex < units.length - 1) {
-      fileSize /= 1024;
-      unitIndex++;
-    }
-
-    return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
-  }
-
-  public static getFileInfo(filePath: string): IFileInfo {
-    const stats = statSync(filePath);
-    return {
-      name: filePath,
-      isDirectory: stats.isDirectory(),
-      size: stats.size,
-      lastModified: stats.mtime
-    };
-  }
   protected configure(): void {
     this.command
       .description("List files in the current directory")

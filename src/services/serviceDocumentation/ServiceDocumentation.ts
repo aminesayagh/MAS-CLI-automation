@@ -24,7 +24,6 @@ export class DocumentationService {
   public constructor(config: Partial<IDocumentationConfig> = {}) {
     this.config = { ...DocumentationService.DEFAULT_CONFIG, ...config };
 
-    console.log(this.config);
     this.fileSystemService = new FileSystemService(
       this.config.maxFileSize,
       this.config.excludePatterns,

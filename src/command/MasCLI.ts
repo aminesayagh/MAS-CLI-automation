@@ -10,7 +10,7 @@ import { CommandDoc } from "./CommandDoc";
 import { CliCommandRegistry } from "./cli/CliCommandRegistry";
 import { CliOptionPrompt } from "./cli/CliOptionPrompt";
 import { CliExecutor } from "./cli/CliExecutor";
-import { ICommandInfo } from "../types/command";
+import { ICommandInfo, commandNameSchema } from "../types/command";
 
 /**
  * Main CLI application class that orchestrates command registration,
@@ -29,8 +29,14 @@ export class MasCLI {
    */
   public async run(): Promise<void> {
     try {
-      const isInteractive = process.argv.length <= 2;
-      await this.showInteractiveMenu(isInteractive);
+      const args = process.argv.slice(2);
+      if (args.length == 0) {
+        // No command specified - show interactive menu
+        await this.runInteractiveMode();
+      } else {
+        // Command specified - use command line mode
+        await this.runCommandLineMode(args);
+      }
     } catch (error) {
       console.error(colors.red("An error occurred:"), error);
       process.exit(1);
@@ -44,6 +50,62 @@ export class MasCLI {
     this.registry.registerCommand(new CommandList());
     this.registry.registerCommand(new CommandDoc());
     this.registry.registerCommand(new CommandExit());
+  }
+
+  /**
+   * Run CLI in interactive mode with menu
+   */
+
+  private async runInteractiveMode(): Promise<void> {
+    console.log(
+      colors.yellow(
+        "\nWelcome to MAS CLI - Your Development Workflow Assistant\n"
+      )
+    );
+
+    while (true) {
+      const command = await this.promptCommand();
+      if (!command) return;
+
+      try {
+        await this.handleCommandExecution(command);
+        if (!(await this.promptContinue())) {
+          break;
+        }
+      } catch (error) {
+        await this.handleError(error);
+      }
+    }
+    
+  }
+
+  /**
+   * Run CLI in command line mode
+   */
+  private async runCommandLineMode(args: string[]): Promise<void> {
+    const commandName = commandNameSchema.parse(args[0]);
+    const commandInfo = this.registry.getCommand(commandName);
+
+    if (!commandInfo) {
+      console.error(colors.red(`Unknown command: ${commandName}`));
+      console.log(colors.yellow("Available commands:"));
+      this.registry.getAllCommands().forEach(([name, info]) => {
+        console.log(
+          `  ${colors.cyan(name.padEnd(15))} ${info.command.description()}`
+        );
+      });
+      process.exit(1);
+    }
+
+    try {
+      // Parse command line arguments using Commander
+      commandInfo.command.parse(process.argv);
+      const options = commandInfo.command.opts();
+      await CliExecutor.executeCommand(commandInfo, options);
+    } catch (error) {
+      console.error(colors.red("Error executing command:"), error);
+      process.exit(1);
+    }
   }
 
   /**
@@ -112,7 +174,7 @@ export class MasCLI {
   /**
    * Prompt user whether to continue using CLI
    */
-  private async promptContinue(): Promise<void> {
+  private async promptContinue(): Promise<boolean> {
     const { shouldContinue } = await inquirer.prompt([
       {
         type: "confirm",
@@ -124,8 +186,9 @@ export class MasCLI {
 
     if (!shouldContinue) {
       console.log(colors.yellow("\nThank you for using MAS CLI. Goodbye!\n"));
-      process.exit(0);
     }
+
+    return shouldContinue;
   }
 
   /**

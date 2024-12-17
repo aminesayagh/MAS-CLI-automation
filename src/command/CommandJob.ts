@@ -5,7 +5,7 @@ import path from "path";
 
 import { BaseCommand } from "../types/command";
 import { CommandName } from "../types/command";
-import { withFallback } from "../types/zod";
+// import { withFallback } from "../types/zod";
 
 interface IJob {
   id: number;
@@ -20,15 +20,14 @@ export interface ICommandOptionsJob {
 }
 
 export class CommandJob extends BaseCommand<ICommandOptionsJob> {
-  private readonly jobsFile = "masconf.json";
-
   public static readonly DEFAULT_CONFIG: ICommandOptionsJob = {
     jobId: undefined
   };
-
   public readonly SCHEMA = zod.object({
     jobId: zod.number().optional()
   });
+
+  private readonly jobsFile = "masconf.json";
 
   public constructor() {
     super("job");
@@ -40,7 +39,12 @@ export class CommandJob extends BaseCommand<ICommandOptionsJob> {
 
       if (parsedOptions.jobId !== undefined) {
         await this.executeJob(parsedOptions.jobId);
-      } else if (this.hasJob()) {
+      } else if (await this.hasJob()) {
+        console.log(
+          colors.yellow(
+            "No job ID specified. Please specify a job ID or use the --list option to view available jobs."
+          )
+        );
       } else {
         console.log(
           colors.yellow(
@@ -60,6 +64,11 @@ export class CommandJob extends BaseCommand<ICommandOptionsJob> {
       .option("-i, --job-id <id>", "Execute a specific job by ID", value =>
         parseInt(value)
       );
+  }
+
+  private async hasJob(): Promise<boolean> {
+    const jobs = await this.readJobs();
+    return jobs.length > 0;
   }
 
   private async readJobs(): Promise<IJob[]> {

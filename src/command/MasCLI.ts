@@ -76,7 +76,6 @@ export class MasCLI {
         await this.handleError(error);
       }
     }
-    
   }
 
   /**
@@ -105,32 +104,6 @@ export class MasCLI {
     } catch (error) {
       console.error(colors.red("Error executing command:"), error);
       process.exit(1);
-    }
-  }
-
-  /**
-   * Display interactive menu and handle command execution
-   * @param showWelcome Whether to show welcome message
-   */
-  private async showInteractiveMenu(
-    showWelcome: boolean = true
-  ): Promise<void> {
-    if (showWelcome) {
-      console.log(
-        colors.yellow(
-          "\nWelcome to MAS CLI - Your Development Workflow Assistant\n"
-        )
-      );
-    }
-
-    const command = await this.promptCommand();
-    if (!command) return;
-
-    try {
-      await this.handleCommandExecution(command);
-      await this.promptContinue();
-    } catch (error) {
-      await this.handleError(error);
     }
   }
 

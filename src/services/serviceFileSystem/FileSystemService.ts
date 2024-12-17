@@ -91,7 +91,6 @@ export class FileSystemService {
     return parseFloat(value) * units[unit.toUpperCase() as keyof typeof units];
   }
 
-  
   public static getFileInfo(filePath: string): IFileInfo {
     const stats = statSync(filePath);
     return {
@@ -105,5 +104,4 @@ export class FileSystemService {
   private isHidden(filePath: string): boolean {
     return path.basename(filePath).startsWith(".");
   }
-
 }

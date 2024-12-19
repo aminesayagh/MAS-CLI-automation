@@ -12,16 +12,44 @@ interface IFileInfo {
 }
 
 export class FileSystemService {
+  private readonly excludeRegexPatterns: RegExp[];
+
   constructor(
     private readonly maxFileSize: number,
-    private readonly excludePatterns: string[],
+    excludePatterns: string[],
     private readonly ignoreHidden: boolean,
     private readonly pattern: RegExp
-  ) {}
+  ) {
+    this.excludeRegexPatterns = excludePatterns.map(
+      pattern => new RegExp(pattern.replace(/\*/g, ".*"))
+    );
+  }
 
   async readDirectory(dirPath: string): Promise<string[]> {
-    const entries = await fs.readdir(dirPath);
-    return entries.map(entry => path.join(dirPath, entry));
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const filteredEntries = entries.filter(entry => {
+      const fullPath = path.join(dirPath, entry.name);
+
+      // Early filtering of hidden files/directories
+      if (this.ignoreHidden && this.isHidden(entry.name)) {
+        return false;
+      }
+
+      // Early filtering of excluded patterns
+      if (this.isExcluded(fullPath)) {
+        return false;
+      }
+
+      // For directories, include if not excluded
+      if (entry.isDirectory()) {
+        return true;
+      }
+
+      // For files, check pattern match
+      return this.pattern.test(fullPath);
+    });
+
+    return filteredEntries.map(entry => path.join(dirPath, entry.name));
   }
 
   async getFileStats(filePath: string): Promise<Stats> {
@@ -38,9 +66,7 @@ export class FileSystemService {
 
   public shouldInclude(filePath: string): boolean {
     if (this.ignoreHidden && this.isHidden(filePath)) return false;
-    return !this.excludePatterns.some(pattern =>
-      new RegExp(pattern.replace(/\*/g, ".*")).test(filePath)
-    );
+    return !this.isExcluded(filePath);
   }
 
   public isWithinSizeLimit(size: number): boolean {
@@ -52,9 +78,7 @@ export class FileSystemService {
       !this.isHidden(filePath) &&
       this.pattern.test(filePath) &&
       size <= this.maxFileSize &&
-      !this.excludePatterns.some(pattern =>
-        new RegExp(pattern.replace(/\*/g, ".*")).test(filePath)
-      )
+      !this.isExcluded(filePath)
     );
   }
 
@@ -103,5 +127,9 @@ export class FileSystemService {
 
   private isHidden(filePath: string): boolean {
     return path.basename(filePath).startsWith(".");
+  }
+
+  private isExcluded(filePath: string): boolean {
+    return this.excludeRegexPatterns.some(pattern => pattern.test(filePath));
   }
 }

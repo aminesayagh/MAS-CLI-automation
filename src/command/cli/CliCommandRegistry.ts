@@ -50,7 +50,7 @@ export class CliCommandRegistry {
    */
   private initializeProgram(): void {
     this.program
-      .name("mas")
+      .name("cw")
       .description("CLI automation tools for developers")
       .version("0.0.1");
 

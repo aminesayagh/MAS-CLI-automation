@@ -2,7 +2,9 @@ import { Command } from "commander";
 import {
   IBaseCommand,
   CommandRegistry,
-  ICommandInfo
+  ICommandInfo,
+  CommandName,
+  commandNameSchema
 } from "../../types/command";
 
 /**
@@ -22,7 +24,8 @@ export class CliCommandRegistry {
    * @param command Command instance to register
    */
   public registerCommand<T>(command: IBaseCommand<T>): void {
-    this.commandRegistry.set(command.command.name(), {
+    const name = commandNameSchema.parse(command.command.name());
+    this.commandRegistry.set(name, {
       SCHEMA: command.SCHEMA,
       command: command.command,
       execute: command.execute as (options: unknown) => Promise<void>
@@ -34,7 +37,7 @@ export class CliCommandRegistry {
    * Get registered command by name
    * @param name Command name
    */
-  public getCommand(name: string): ICommandInfo<unknown> | undefined {
+  public getCommand(name: CommandName): ICommandInfo<unknown> | undefined {
     return this.commandRegistry.get(name);
   }
 

@@ -26,4 +26,7 @@ export interface ICommandInfo<T> {
   execute: (options: T) => Promise<void>;
 }
 
-export type CommandRegistry = Map<string, ICommandInfo<unknown>>;
+export const commandNameSchema = zod.enum(["doc", "list", "exit"]);
+
+export type CommandName = zod.infer<typeof commandNameSchema>;
+export type CommandRegistry = Map<CommandName, ICommandInfo<unknown>>;

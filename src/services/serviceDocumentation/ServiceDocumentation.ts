@@ -38,7 +38,7 @@ export class DocumentationService {
       this.config.compress
     );
 
-    this.markdownService = new MarkdownService();
+    this.markdownService = new MarkdownService(this.config);
   }
 
   public async run(): Promise<void> {

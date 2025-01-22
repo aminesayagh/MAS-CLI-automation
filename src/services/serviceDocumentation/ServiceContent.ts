@@ -38,10 +38,16 @@ export class ContentService {
   }
 
   private compressContent(content: string): string {
-    return content
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line !== "" && !line.startsWith("//"))
-      .join("\n");
+    return (
+      content
+        .split("\n")
+        .map(line => line.trim())
+        // if line is empty, remove it
+        .filter(line => line !== "")
+        // if line is a comment, remove it
+        .filter(line => !line.startsWith("//"))
+        .map(line => line.trim())
+        .join("\n")
+    );
   }
 }

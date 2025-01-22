@@ -1,6 +1,8 @@
 import { IFileInfo } from "./types";
+import { IDocumentationConfig } from "./types";
 
 export class MarkdownService {
+  constructor(private readonly config: IDocumentationConfig) {}
   generateMarkdown(files: IFileInfo[], treeContent: string): string {
     const header = this.generateHeader(files.length, treeContent);
     const filesSections = files
@@ -12,7 +14,7 @@ export class MarkdownService {
   private generateHeader(totalFiles: number, treeContent: string): string {
     return `# Code Documentation
 Generated on: ${new Date().toISOString()}
-Total files: ${totalFiles}
+${this.config.compress ? "" : `Total files: ${totalFiles}`}
 
 ## Project Structure
 
@@ -22,6 +24,14 @@ ${treeContent}
   }
 
   private generateFileSection(file: IFileInfo): string {
+    const isToCompress = this.config.compress;
+    if (isToCompress) {
+      return `
+Path: ${file.path}
+\`\`\`${file.ext.slice(1) || "plaintext"}
+${file.content}
+\`\`\``;
+    }
     return `
 ## File: ${file.name}
 - Path: \`${file.path}\`
